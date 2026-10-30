@@ -15,3 +15,7 @@
 ## Release gate
 
 Do not call the project complete or public until a real HTTP server starts, browser/mobile/keyboard checks run, the requested Angular/Express/PostgreSQL stack decision is resolved, GitHub source is safely published, and a read-only deployment is verified at its actual URL. Current version is a tested offline/local implementation, not a hosted SaaS product.
+
+## Repository and hosting state
+
+The independent local repository is on `main` at initial commit `137cf33`, using the requested GitHub noreply author identity. No `origin` is configured because the GitHub repository has not been created. The portfolio source snapshot has the local feature commit `7481a5f`. In this agent session, `gh auth status` still marks the token invalid and GitHub DNS is unavailable; neither remote repository creation/push nor the Render service/Pages publication was performed. The public source and live demo URLs remain unavailable, not merely untested.

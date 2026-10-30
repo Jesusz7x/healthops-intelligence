@@ -124,8 +124,23 @@ class HealthOpsApiTests(unittest.TestCase):
             self.assertTrue(data['read_only_mode'])
             self.assertIn('Secure',headers['Set-Cookie'])
             self.assertEqual(self.req('/api/audit')[0],200)
+            self.assertEqual(self.req('/api/users')[0],403)
             self.assertEqual(self.login('admin@healthops.local','DemoHealthOps!2026')[0],401)
-            self.assertEqual(self.req('/api/patients','POST',{'code':'PUBLIC-NO','full_name':'Read Only','email':'ro@example.invalid','age':20})[0],403)
+            writes=[
+                ('/api/patients','POST',{'code':'PUBLIC-NO','full_name':'Read Only','email':'ro@example.invalid','age':20}),
+                ('/api/patients/1','PATCH',{'age':44}),
+                ('/api/appointments','POST',{'patient_id':1,'staff_id':1,'starts_at':'2026-11-01T09:30:00Z','department':'Demo'}),
+                ('/api/appointments/1','PATCH',{'status':'completed'}),
+                ('/api/staff','POST',{'code':'PUBLIC-STAFF','full_name':'Demo','role':'Staff','department':'Demo'}),
+                ('/api/inventory','POST',{'sku':'PUBLIC-SKU','name':'Demo','category':'Demo','quantity':1,'reorder_level':1}),
+                ('/api/inventory/1/movements','POST',{'delta':1,'reason':'demo'}),
+                ('/api/settings','PATCH',{'facility_name':'Changed'}),
+                ('/api/users/1','PATCH',{'role':'admin'}),
+            ]
+            for path,method,payload in writes:
+                with self.subTest(path=path,method=method):
+                    self.assertEqual(self.req(path,method,payload)[0],403)
+            self.assertEqual(self.req('/api/import/patients','POST',raw='code,full_name,email,age\nX,Demo,demo@example.invalid,20\n')[0],403)
         finally: server.READ_ONLY_MODE=original; server.SECURE_COOKIES=original_secure
 
     def test_read_only_database_seeds_visitor_without_administrator_accounts(self):

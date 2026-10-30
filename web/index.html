@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f4f7fb"><meta name="description" content="HealthOps Intelligence — fictional healthcare operations intelligence demo.">
+<title>HealthOps Intelligence</title><link rel="stylesheet" href="/styles.css"><script src="/app.js" defer></script>
+</head>
+<body>
+<div id="notice" class="notice" role="status" aria-live="polite"></div>
+<section id="login-screen" class="login-wrap" hidden>
+  <div class="login-card"><div class="brand-mark">H</div><p class="eyebrow">HEALTHOPS INTELLIGENCE</p><h1 data-i="signIn">Sign in to your workspace</h1><p class="muted" data-i="demoNotice">Fictional training environment. No patient data.</p>
+  <form id="login-form"><label><span data-i="email">Email</span><input name="email" type="email" value="admin@healthops.local" autocomplete="username" required></label><label><span data-i="password">Password</span><input name="password" type="password" value="DemoHealthOps!2026" autocomplete="current-password" required></label><button class="button primary wide" data-i="signIn">Sign in</button></form><p class="demo-credential"><span data-i="demoAdmin">Demo admin:</span> admin@healthops.local · DemoHealthOps!2026</p></div>
+</section>
+<div id="app-shell" class="shell" hidden>
+<aside class="sidebar"><a class="brand" href="#dashboard"><span class="brand-mark">H</span><span><b>HealthOps</b><small>INTELLIGENCE</small></span></a><div class="facility"><span class="pulse"></span><span data-i="demoCenter">Demo Center</span></div>
+<nav aria-label="Main navigation" data-aria-i="mainNav"><p class="nav-label" data-i="workspace">WORKSPACE</p>
+<a href="#dashboard" data-view="dashboard" class="nav-link active"><span>▦</span><span data-i="dashboard">Dashboard</span></a>
+<a href="#patients" data-view="patients" class="nav-link"><span>♙</span><span data-i="patients">Patients</span></a>
+<a href="#appointments" data-view="appointments" class="nav-link"><span>◷</span><span data-i="appointments">Appointments</span></a>
+<a href="#staff" data-view="staff" class="nav-link"><span>♧</span><span data-i="staff">Staff & roles</span></a>
+<a href="#inventory" data-view="inventory" class="nav-link"><span>▤</span><span data-i="inventory">Inventory</span></a>
+<p class="nav-label" data-i="insights">INSIGHTS</p>
+<a href="#reports" data-view="reports" class="nav-link"><span>⌁</span><span data-i="reports">Reports & trends</span></a>
+<a href="#audit" data-view="audit" class="nav-link admin-only"><span>◉</span><span data-i="audit">Audit log</span></a>
+<p class="nav-label" data-i="system">SYSTEM</p><a href="#settings" data-view="settings" class="nav-link admin-only"><span>⚙</span><span data-i="settings">Settings</span></a></nav>
+<div class="sidebar-bottom"><div class="safety-note"><b data-i="demoEnvironment">DEMO ENVIRONMENT</b><span data-i="syntheticOnly">All records are synthetic.</span></div><div id="user-chip" class="user-chip"></div></div></aside>
+<main class="main"><header class="topbar"><button id="mobile-menu" class="icon-button" aria-label="Open navigation" data-aria-i="navToggle">☰</button><div class="crumb"><span data-i="workspace">WORKSPACE</span><b id="page-title">Dashboard</b></div><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" placeholder="Search records…" aria-label="Search records…" data-placeholder-i="search" data-aria-i="search"></label><div class="top-actions"><span class="live-status"><i></i><span data-i="systemOnline">System online</span></span><button id="lang-toggle" class="icon-button" aria-label="Change language" data-aria-i="language">ES</button><button id="theme-toggle" class="icon-button" aria-label="Toggle color theme" data-aria-i="theme">◐</button><button id="logout" class="button ghost" data-i="signOut">Sign out</button></div></header>
+<div class="content"><div id="page-content" aria-live="polite"></div></div><footer><span>HealthOps Intelligence <span data-i="version">Demo · v0.1</span></span><span data-i="notClinical">Not a clinical system · fictional data only</span></footer></main></div>
+<dialog id="record-dialog" class="record-dialog"><form id="record-form" method="dialog"><div class="dialog-head"><div><p class="eyebrow" id="dialog-eyebrow">NEW RECORD</p><h2 id="dialog-title">Add record</h2></div><button type="button" class="icon-button" id="dialog-close" aria-label="Close" data-aria-i="close">×</button></div><div id="form-fields" class="form-grid"></div><div class="dialog-actions"><button type="button" id="dialog-cancel" class="button ghost" data-i="cancel">Cancel</button><button type="submit" class="button primary" data-i="saveRecord">Save record</button></div></form></dialog>
+<dialog id="history-dialog" class="record-dialog"><div class="dialog-head"><div><p class="eyebrow" data-i="inventoryLedger">INVENTORY LEDGER</p><h2 id="history-title">Movements</h2></div><button type="button" class="icon-button" id="history-close" aria-label="Close" data-aria-i="close">×</button></div><div id="history-content"></div></dialog>
+</body></html>

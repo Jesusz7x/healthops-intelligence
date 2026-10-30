@@ -1,0 +1,291 @@
+openapi: 3.1.0
+info:
+  title: HealthOps Intelligence Demo API
+  version: 0.1.0
+  description: Fictional, local-first operations API. Not a clinical or certified healthcare system.
+servers:
+  - url: http://127.0.0.1:8787/api
+security:
+  - sessionCookie: []
+paths:
+  /health:
+    get:
+      security: []
+      summary: Health probe
+      responses:
+        '200': { description: Ready; includes synthetic_data_only=true }
+  /auth/login:
+    post:
+      security: []
+      summary: Start an eight-hour local session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, maxLength: 254 }
+                password: { type: string, maxLength: 256 }
+      responses:
+        '200': { description: Authenticated; HttpOnly session cookie is set }
+        '401': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /auth/logout:
+    post:
+      summary: End current session
+      responses:
+        '200': { description: Session cookie cleared }
+        '401': { $ref: '#/components/responses/Error' }
+  /auth/me:
+    get:
+      security: []
+      summary: Read current session user
+      responses:
+        '200': { description: User object or null }
+  /dashboard:
+    get:
+      summary: Operational KPI totals
+      responses:
+        '200': { description: Synthetic patient, appointment, staff, and stock counts }
+  /reports:
+    get:
+      summary: Daily series, seven-day comparison, inventory flags, anomaly flags, and baseline forecast
+      responses:
+        '200': { description: Descriptive analytical report with methods and limitations }
+  /data-quality:
+    get:
+      summary: Scan synthetic registry for validation issues and possible duplicate names
+      responses:
+        '200': { description: Findings only; no automatic corrections }
+  /patients:
+    get:
+      parameters:
+        - { in: query, name: q, schema: { type: string, maxLength: 100 } }
+        - { in: query, name: status, schema: { type: string, enum: [active, inactive] } }
+      responses:
+        '200': { description: Up to 500 patient records }
+        '401': { $ref: '#/components/responses/Error' }
+    post:
+      description: Requires admin, operations, or clinical role. Demo emails must end in .invalid.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, full_name, age]
+              properties:
+                code: { type: string, maxLength: 32 }
+                full_name: { type: string, maxLength: 120 }
+                email: { type: string, format: email, maxLength: 254, pattern: '.*\.invalid$' }
+                age: { type: integer, minimum: 0, maximum: 120 }
+                status: { type: string, enum: [active, inactive] }
+      responses:
+        '201': { description: Created }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /patients/{id}:
+    patch:
+      parameters:
+        - { $ref: '#/components/parameters/id' }
+      description: Requires admin, operations, or clinical role. Only full_name, email, age, status are accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, minProperties: 1, additionalProperties: true }
+      responses:
+        '200': { description: Updated record }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /appointments:
+    get:
+      parameters:
+        - { in: query, name: status, schema: { type: string, enum: [scheduled, completed, cancelled, no_show] } }
+      responses:
+        '200': { description: Up to 500 appointments joined to fictional patient/staff labels }
+    post:
+      description: Requires admin, operations, or clinical role. Requires active patient/staff and timezone-aware ISO-8601 datetime; prevents exact-time staff double booking.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [patient_id, staff_id, starts_at, department]
+              properties:
+                patient_id: { type: integer }
+                staff_id: { type: integer }
+                starts_at: { type: string, format: date-time }
+                department: { type: string, maxLength: 80 }
+      responses:
+        '201': { description: Scheduled appointment created }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /appointments/{id}:
+    patch:
+      parameters:
+        - { $ref: '#/components/parameters/id' }
+      description: One-way transition from scheduled to completed, cancelled, or no_show.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [completed, cancelled, no_show] }
+      responses:
+        '200': { description: Status changed }
+        '409': { $ref: '#/components/responses/Error' }
+  /staff:
+    get:
+      responses:
+        '200': { description: Staff directory }
+    post:
+      description: Administrator only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, full_name, role, department]
+              properties:
+                code: { type: string }
+                full_name: { type: string }
+                role: { type: string }
+                department: { type: string }
+      responses:
+        '201': { description: Created }
+        '403': { $ref: '#/components/responses/Error' }
+  /users:
+    get:
+      description: Administrator only; returns seeded demo accounts, never password hashes.
+      responses:
+        '200': { description: Account roles and active states }
+        '403': { $ref: '#/components/responses/Error' }
+  /users/{id}:
+    patch:
+      parameters:
+        - { $ref: '#/components/parameters/id' }
+      description: Administrator only; preserves at least one active administrator.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role: { type: string, enum: [admin, operations, clinical, inventory, viewer] }
+                active: { type: boolean }
+      responses:
+        '200': { description: Updated }
+        '409': { $ref: '#/components/responses/Error' }
+  /inventory:
+    get:
+      responses:
+        '200': { description: Items with quantity, unit, category, and reorder level }
+    post:
+      description: Requires admin or inventory role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sku, name, category, quantity, reorder_level]
+              properties:
+                sku: { type: string }
+                name: { type: string }
+                category: { type: string }
+                quantity: { type: integer, minimum: 0 }
+                reorder_level: { type: integer, minimum: 0 }
+                unit: { type: string }
+      responses:
+        '201': { description: Item created }
+  /inventory/{id}/movements:
+    get:
+      parameters:
+        - { $ref: '#/components/parameters/id' }
+      responses:
+        '200': { description: Up to 100 stock ledger rows }
+    post:
+      parameters:
+        - { $ref: '#/components/parameters/id' }
+      description: Requires admin or inventory role; stock cannot fall below zero.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delta, reason]
+              properties:
+                delta: { type: integer, not: { const: 0 } }
+                reason: { type: string, maxLength: 160 }
+      responses:
+        '200': { description: Movement applied }
+        '409': { $ref: '#/components/responses/Error' }
+  /import/patients:
+    post:
+      description: Atomic import, maximum 1 MB and 1000 data rows; admin or operations role. Headers code,full_name,email,age.
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: { type: string }
+      responses:
+        '201': { description: Number imported }
+        '400': { $ref: '#/components/responses/Error' }
+  /export/patients.csv:
+    get:
+      responses:
+        '200': { description: CSV with formula-injection escaping, text/csv }
+  /audit:
+    get:
+      description: Administrator only; last 200 actions.
+      responses:
+        '200': { description: Audit events }
+        '403': { $ref: '#/components/responses/Error' }
+  /settings:
+    get:
+      responses:
+        '200': { description: Demo configuration }
+    patch:
+      description: Administrator only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { facility_name: {type: string}, low_stock_threshold: {type: number, minimum: 0, maximum: 1} } }
+      responses:
+        '200': { description: Updated }
+        '400': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: healthops_session
+  parameters:
+    id:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, minimum: 1 }
+  responses:
+    Error:
+      description: Structured error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  message: { type: string }

@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: healthops-intelligence-demo
+    runtime: python
+    plan: free
+    buildCommand: python3 --version
+    startCommand: python3 api/server.py
+    healthCheckPath: /api/health
+    envVars:
+      - key: HEALTHOPS_HOST
+        value: 0.0.0.0
+      - key: HEALTHOPS_READ_ONLY
+        value: "1"
+      - key: HEALTHOPS_SECURE_COOKIES
+        value: "1"

@@ -1,7 +1,8 @@
-"""In-process API integration tests (the execution sandbox does not permit sockets)."""
+"""In-process API integration tests for route logic."""
 import io, json, os, sys, tempfile, unittest
 from pathlib import Path
 from email.message import Message
+from http.server import BaseHTTPRequestHandler
 
 _temp=tempfile.TemporaryDirectory(prefix='healthops-test-')
 os.environ['HEALTHOPS_DB']=str(Path(_temp.name)/'healthops.sqlite3')
@@ -20,7 +21,7 @@ class HealthOpsApiTests(unittest.TestCase):
         h.headers['Content-Type']='text/csv' if raw is not None else 'application/json'
         if self.cookie: h.headers['Cookie']=self.cookie
         h.rfile=io.BytesIO(body); h.wfile=io.BytesIO()
-        h.handle()
+        h.dispatch_request()
         output=h.wfile.getvalue(); head,payload=output.split(b'\r\n\r\n',1)
         lines=head.decode().split('\r\n'); status=int(lines[0].split()[1]); headers=Message()
         for line in lines[1:]:
@@ -34,10 +35,14 @@ class HealthOpsApiTests(unittest.TestCase):
         return status,content,headers
     def login(self,email='admin@healthops.local',password='DemoHealthOps!2026'):
         return self.req('/api/auth/login','POST',{'email':email,'password':password})
+    def test_handler_keeps_the_standard_base_http_lifecycle(self):
+        self.assertIs(server.Handler.handle,BaseHTTPRequestHandler.handle)
+
     def test_health_and_static_frontend_are_public(self):
         self.assertEqual(self.req('/api/health')[1]['status'],'ok')
+        self.assertEqual(self.req('/health')[1]['synthetic_data_only'],True)
         code,body,_=self.req('/')
-        self.assertEqual(code,200); self.assertIn('HealthOps Intelligence',body)
+        self.assertEqual(code,200); self.assertIn('HealthOps Intelligence',body); self.assertIn('visitor@healthops.local',body); self.assertIn('not certified clinical software',body.lower())
     def test_password_hash_and_login_cookie(self):
         code,data,headers=self.login(); self.assertEqual(code,200); self.assertEqual(data['user']['role'],'admin')
         self.assertIn('HttpOnly',headers['Set-Cookie']); self.assertIn('SameSite=Strict',headers['Set-Cookie'])
@@ -109,13 +114,38 @@ class HealthOpsApiTests(unittest.TestCase):
         original=server.READ_ONLY_MODE
         try:
             server.READ_ONLY_MODE=True
-            code,data,_=self.login()
+            code,data,_=self.login(store.PUBLIC_VISITOR_EMAIL,store.PUBLIC_VISITOR_PASSWORD)
             self.assertEqual(code,200); self.assertEqual(data['user']['role'],'viewer')
+            self.assertTrue(data['read_only_mode'])
+            self.assertEqual(self.req('/api/audit')[0],200)
+            self.assertEqual(self.login('admin@healthops.local','DemoHealthOps!2026')[0],401)
             self.assertEqual(self.req('/api/patients','POST',{'code':'PUBLIC-NO','full_name':'Read Only','email':'ro@example.invalid','age':20})[0],403)
         finally: server.READ_ONLY_MODE=original
+
+    def test_read_only_database_seeds_visitor_without_administrator_accounts(self):
+        with tempfile.TemporaryDirectory(prefix='healthops-public-seed-') as temp:
+            path=Path(temp)/'public.sqlite3'
+            store.initialize(path,public_read_only=True)
+            with store.connect(path) as db:
+                users=[dict(row) for row in db.execute('SELECT email,role FROM users')]
+                self.assertEqual(users,[{'email':store.PUBLIC_VISITOR_EMAIL,'role':'viewer'}])
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM patients').fetchone()[0],5)
     def test_missing_json_content_type_is_rejected(self):
-        h=object.__new__(server.Handler); h.command='POST'; h.path='/api/auth/logout'; h.request_version='HTTP/1.1'; h.requestline='POST /api/auth/logout HTTP/1.1'; h.client_address=('127.0.0.1',1); h.headers=Message(); h.headers['Content-Length']='2'; h.rfile=io.BytesIO(b'{}'); h.wfile=io.BytesIO(); h.handle()
+        h=object.__new__(server.Handler); h.command='POST'; h.path='/api/auth/logout'; h.request_version='HTTP/1.1'; h.requestline='POST /api/auth/logout HTTP/1.1'; h.client_address=('127.0.0.1',1); h.headers=Message(); h.headers['Content-Length']='2'; h.rfile=io.BytesIO(b'{}'); h.wfile=io.BytesIO(); h.dispatch_request()
         head,payload=h.wfile.getvalue().split(b'\r\n\r\n',1)
         self.assertIn(b' 415 ',head); self.assertIn(b'Content-Type must be application/json',payload)
+
+    def test_disconnected_client_does_not_trigger_a_second_error_response(self):
+        class BrokenWriter:
+            attempts=0
+            def write(self, data):
+                self.attempts+=1
+                raise BrokenPipeError('synthetic disconnected client')
+        h=object.__new__(server.Handler); h.command='GET'; h.path='/api/health'; h.request_version='HTTP/1.1'; h.requestline='GET /api/health HTTP/1.1'; h.wfile=BrokenWriter(); h.close_connection=False
+        h.send_json(200,{'status':'ok'})
+        self.assertTrue(h.close_connection)
+        self.assertTrue(h._response_started)
+        h._send_error(500,{'error':{'message':'safe'}})
+        self.assertEqual(h.wfile.attempts,1)
 
 if __name__=='__main__': unittest.main(verbosity=2)

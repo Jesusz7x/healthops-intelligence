@@ -9,7 +9,7 @@
 - Bilingual English/Spanish responsive HTML, CSS, and JavaScript interface with light/dark themes.
 - Password hashing with PBKDF2-HMAC-SHA256, random session tokens stored as hashes, HttpOnly/SameSite cookies, role checks, login throttling, and audit events.
 - Dashboard, fictional patient registry, appointments, staff directory and demo account roles, stock movements, CSV import/export, data-quality checks, audit log, settings, daily trends, robust anomaly flags, and a simple demand baseline.
-- Python quality-review CLI and 18 automated integration/unit and frontend-contract tests.
+- Python quality-review CLI, 23 API, unit, frontend, and deployment-config tests, and 4 real-HTTP integration tests (the latter run where local socket permissions allow).
 
 The first runnable version uses the standard library because Angular/Express packages are not installed and package-registry access is unavailable in the build environment. PostgreSQL is installed as a client, but no server is running. **Angular, Express, PostgreSQL, and browser-level end-to-end tests are not part of this verified version.** The REST contract is documented so those components can replace/extend the local adapter in a future stage. This limitation is not hidden or presented as completed work.
 
@@ -24,9 +24,9 @@ python3 api/server.py
 
 Open `http://127.0.0.1:8787`. The service binds only to loopback by default. On first start it creates `data/healthops.sqlite3` and seeds fictional records. The database is ignored by Git.
 
-### Demo accounts
+### Local demo accounts
 
-All accounts use the local demo password `DemoHealthOps!2026`. Never reuse it outside this fictional local demo.
+The local editable demo uses the password `DemoHealthOps!2026` for these fictional accounts. They are for local development only.
 
 | Email | Role |
 |---|---|
@@ -36,6 +36,15 @@ All accounts use the local demo password `DemoHealthOps!2026`. Never reuse it ou
 | `stock@healthops.local` | Inventory |
 | `viewer@healthops.local` | Read only |
 
+### Public Render visitor
+
+When `HEALTHOPS_READ_ONLY=1`, initialization seeds only the public visitor on a fresh database and the API accepts only this visitor's login. All authenticated sessions have the `viewer` role; backend write routes reject them.
+
+- Email: `visitor@healthops.local`
+- Public demo password: `HealthOpsViewOnly2026!`
+
+This shared credential is intentionally public and is not a private secret. Do not reuse it. The service uses fictitious data only and is not certified clinical software.
+
 ## Test
 
 ```sh
@@ -44,7 +53,7 @@ node --check web/app.js
 python3 -m py_compile api/*.py processing/*.py
 ```
 
-The 13 API integration tests dispatch requests in-process because this agent sandbox denies socket creation. The two data-quality tests exercise the Python analysis module, and three frontend-contract tests verify IDs, translations, and static asset links. These are real handler/database tests, but they do not replace a live HTTP/browser test.
+Sixteen API route/data checks dispatch requests in-process, alongside two data-quality, three frontend-contract, and two deployment-config tests. Four additional tests launch `api/server.py` and exercise real HTTP, cookies, static assets, authorization, and server stderr; this sandbox denies local socket creation, so that class is skipped here. The live HTTP checks must pass in a socket-enabled environment before claiming the server was verified over HTTP; browser E2E is separate and remains untested.
 
 ## Main documents
 

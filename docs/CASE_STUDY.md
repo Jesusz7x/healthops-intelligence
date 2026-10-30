@@ -23,7 +23,7 @@ Security choices include salted PBKDF2 password hashes, hashed random session to
 
 ## Verification and measured results
 
-The implemented version passed 18 automated checks: 13 in-process API integration tests, 2 data-quality unit tests, and 3 frontend-contract tests on Python 3.13.5/Node 20. JavaScript syntax and Python byte-compilation passed. The tests cover authentication, roles, state transitions, constraints, CSV rollback/formula escaping, audit/configuration, quality flags, and read-only mode. No performance benchmark or predictive-accuracy metric is claimed. The sandbox prevented live port binding and browser automation; real HTTP, visual/mobile/accessibility, and public deployment remain unverified.
+The implementation passed 23 non-socket checks: 16 API/request-handler checks, 2 deployment-config checks, 2 data-quality unit tests, and 3 frontend-contract tests; 4 real-HTTP subprocess integration checks are present but were skipped in this sandbox on Python 3.13.5/Node 20. JavaScript syntax and Python byte-compilation passed. The tests cover authentication, roles, state transitions, constraints, CSV rollback/formula escaping, audit/configuration, quality flags, and read-only mode. No performance benchmark or predictive-accuracy metric is claimed. The sandbox denied socket creation (`PermissionError: Operation not permitted`), so the new live HTTP checks could not execute here; real HTTP, visual/mobile/accessibility, and public deployment remain unverified.
 
 ## Decisions and next work
 

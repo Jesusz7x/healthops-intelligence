@@ -9,7 +9,7 @@
 - Interfaz bilingüe adaptable en HTML, CSS y JavaScript, con temas claro y oscuro.
 - Contraseñas con PBKDF2-HMAC-SHA256, tokens de sesión aleatorios guardados como hashes, cookies HttpOnly/SameSite, permisos por rol, límite de intentos de inicio y auditoría.
 - Panel, registro ficticio de pacientes, citas, directorio de personal y roles de cuentas demo, movimientos de inventario, importación/exportación CSV, revisión de calidad de datos, auditoría, configuración, tendencias diarias, alertas experimentales de anomalías y una proyección base de demanda.
-- CLI de revisión CSV y 18 pruebas automatizadas de integración, unitarias y de contrato frontend.
+- CLI de revisión CSV, 23 pruebas de API, unitarias, frontend y configuración de despliegue y 4 pruebas de integración HTTP real (estas últimas requieren permiso para abrir sockets locales).
 
 Esta primera versión ejecutable usa la biblioteca estándar porque Angular/Express no están instalados y el entorno de construcción no tiene acceso al registro de paquetes. PostgreSQL está instalado como cliente, pero no hay servidor activo. **Angular, Express, PostgreSQL y las pruebas de extremo a extremo en navegador no forman parte de la versión verificada.** El contrato REST queda documentado para reemplazar/extender el adaptador local en una fase posterior. Esta limitación no se presenta como funcionalidad terminada.
 
@@ -24,9 +24,9 @@ python3 api/server.py
 
 Abre `http://127.0.0.1:8787`. El servidor solo escucha loopback de forma predeterminada. En el primer inicio crea `data/healthops.sqlite3` y carga registros ficticios. La base de datos está excluida de Git.
 
-### Cuentas de demostración
+### Cuentas locales de demostración
 
-Todas usan la contraseña local de demo `DemoHealthOps!2026`. No la reutilices fuera de esta demostración ficticia.
+La demo editable local usa `DemoHealthOps!2026` en estas cuentas ficticias. Son solo para desarrollo local.
 
 | Correo | Rol |
 |---|---|
@@ -36,6 +36,15 @@ Todas usan la contraseña local de demo `DemoHealthOps!2026`. No la reutilices f
 | `stock@healthops.local` | Inventario |
 | `viewer@healthops.local` | Solo lectura |
 
+### Visitante público de Render
+
+Con `HEALTHOPS_READ_ONLY=1`, una base nueva siembra únicamente al visitante público y la API solo acepta su inicio de sesión. Todas las sesiones autenticadas reciben el rol `viewer`; las rutas de escritura del backend las rechazan.
+
+- Correo: `visitor@healthops.local`
+- Contraseña pública de demostración: `HealthOpsViewOnly2026!`
+
+Esta contraseña compartida es pública intencionalmente, no un secreto privado. No la reutilices. El servicio usa datos ficticios y no es software clínico certificado.
+
 ## Pruebas
 
 ```sh
@@ -44,7 +53,7 @@ node --check web/app.js
 python3 -m py_compile api/*.py processing/*.py
 ```
 
-Las 13 pruebas de integración de API despachan solicitudes dentro del proceso porque este sandbox no permite crear sockets. Dos prueban el módulo Python de calidad y tres verifican IDs, traducciones y enlaces a recursos estáticos del frontend. Son pruebas reales del handler y la base de datos, pero no sustituyen la comprobación con HTTP/navegador real.
+Dieciséis pruebas de rutas/API y datos despachan solicitudes dentro del proceso; se suman dos de calidad, tres del contrato frontend y dos de configuración de despliegue. Otras cuatro pruebas ejecutan `api/server.py` y comprueban HTTP real, cookies, archivos estáticos, permisos y errores en stderr. Este sandbox deniega sockets locales y por eso omite esa clase. Las pruebas HTTP deben pasar en un entorno que permita sockets antes de afirmar que se verificó el servidor por HTTP; las pruebas E2E de navegador son independientes y siguen pendientes.
 
 ## Documentación principal
 

@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from store import connect, initialize, now, verify_password, record_audit, ROLES
+from store import connect, initialize, now, verify_password, record_audit, ROLES, PUBLIC_VISITOR_EMAIL, PUBLIC_VISITOR_PASSWORD
 from analytics import dashboard, reports
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'processing'))
@@ -40,14 +40,23 @@ def normalize_datetime(value):
 
 class Handler(BaseHTTPRequestHandler):
     server_version='HealthOpsDemo/0.1'
+    def send_response(self, code, message=None):
+        # Track the first response attempt so the error handler never writes a
+        # second HTTP status line after headers/body have begun.
+        self._response_started=True
+        return super().send_response(code,message)
     def log_message(self, fmt, *args):
         # Keep logs free of request payloads, names, emails, and session cookies.
         print(f'{self.log_date_time_string()} {self.command} {self.path.split("?")[0]} {args[1] if len(args)>1 else ""}')
     def send_json(self, code, payload, headers=None):
         body=json.dumps(payload,ensure_ascii=False).encode()
-        self.send_response(code); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Content-Length',str(len(body))); self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Cache-Control','no-store'); self.send_header('Content-Security-Policy',"default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'")
-        for k,v in (headers or {}).items(): self.send_header(k,v)
-        self.end_headers(); self.wfile.write(body)
+        try:
+            self.send_response(code); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Content-Length',str(len(body))); self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Cache-Control','no-store'); self.send_header('Content-Security-Policy',"default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'")
+            for k,v in (headers or {}).items(): self.send_header(k,v)
+            self.end_headers(); self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            # A disconnected client must not trigger a second response attempt.
+            self.close_connection=True
     def send_csv(self, name, text):
         data=text.encode('utf-8-sig'); self.send_response(200); self.send_header('Content-Type','text/csv; charset=utf-8'); self.send_header('Content-Disposition',f'attachment; filename="{name}"'); self.send_header('Content-Length',str(len(data))); self.send_header('X-Content-Type-Options','nosniff'); self.end_headers(); self.wfile.write(data)
     def body(self, raw=False):
@@ -85,14 +94,18 @@ class Handler(BaseHTTPRequestHandler):
         user=self.session();
         if user['role'] not in MUTATING_ROLES[category]: fail(403,'Your role cannot perform this action')
         return user
-    def do_GET(self): self.handle()
-    def do_POST(self): self.handle()
-    def do_PATCH(self): self.handle()
-    def do_DELETE(self): self.handle()
-    def handle(self):
+    def _dispatch_http_request(self):
+        self._response_started=False
+        self.dispatch_request()
+    def do_GET(self): self._dispatch_http_request()
+    def do_POST(self): self._dispatch_http_request()
+    def do_PUT(self): self._dispatch_http_request()
+    def do_PATCH(self): self._dispatch_http_request()
+    def do_DELETE(self): self._dispatch_http_request()
+    def dispatch_request(self):
         try:
             path=urlparse(self.path).path
-            if self.command in ('POST','PATCH','DELETE'):
+            if self.command in ('POST','PUT','PATCH','DELETE'):
                 content_type=self.headers.get('Content-Type','').split(';',1)[0].strip().lower()
                 expected='text/csv' if path=='/api/import/patients' else 'application/json'
                 if content_type!=expected: fail(415,f'Content-Type must be {expected}')
@@ -102,13 +115,13 @@ class Handler(BaseHTTPRequestHandler):
                 host=self.headers.get('Host','')
                 expected_origin=f'{scheme}://{host}' if host else ''
                 if origin and origin!=expected_origin: fail(403,'Cross-origin request rejected')
+            if path in ('/health','/api/health') and self.command=='GET': return self.send_json(200,{'status':'ok','product':'HealthOps Intelligence','synthetic_data_only':True})
             if self.command=='GET' and not path.startswith('/api/'):
                 return self.static_file(path)
-            if path=='/api/health' and self.command=='GET': return self.send_json(200,{'status':'ok','product':'HealthOps Intelligence','synthetic_data_only':True})
             if path=='/api/auth/login' and self.command=='POST': return self.login()
             if path=='/api/auth/logout' and self.command=='POST': return self.logout()
             if path=='/api/auth/me' and self.command=='GET':
-                user=self.session(False); return self.send_json(200,{'user':user})
+                user=self.session(False); return self.send_json(200,{'user':user,'read_only_mode':READ_ONLY_MODE})
             user=self.session()
             if path=='/api/dashboard' and self.command=='GET':
                 with self.db() as db: return self.send_json(200,dashboard(db))
@@ -143,7 +156,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json(200,{'items':[dict(r) for r in db.execute('SELECT m.id,m.delta,m.reason,m.created_at,u.display_name actor FROM stock_movements m LEFT JOIN users u ON u.id=m.actor_id WHERE m.inventory_id=? ORDER BY m.id DESC LIMIT 100',(int(m.group(1)),))]})
             if m and self.command=='POST': return self.stock_movement(int(m.group(1)))
             if path=='/api/audit' and self.command=='GET':
-                if user['role']!='admin': fail(403,'Administrator role required')
+                if user['role']!='admin' and not (READ_ONLY_MODE and user['role']=='viewer'): fail(403,'Administrator role required')
                 with self.db() as db: return self.send_json(200,{'items':[dict(r) for r in db.execute('SELECT a.id,u.display_name actor,a.action,a.entity,a.entity_id,a.detail,a.created_at FROM audit a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.id DESC LIMIT 200')]})
             if path=='/api/settings' and self.command=='GET':
                 with self.db() as db: return self.send_json(200,{'settings':{r['key']:r['value'] for r in db.execute('SELECT key,value FROM settings')}})
@@ -151,11 +164,16 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/import/patients' and self.command=='POST': return self.import_patients()
             if path=='/api/export/patients.csv' and self.command=='GET': return self.export_patients()
             fail(404,'Endpoint not found')
-        except ApiError as e: self.send_json(e.status,{'error':{'message':e.message}})
+        except ApiError as e: self._send_error(e.status,{'error':{'message':e.message}})
         except sqlite3.IntegrityError as e:
-            self.send_json(409,{'error':{'message':'The record conflicts with existing data or a constraint'}})
+            self._send_error(409,{'error':{'message':'The record conflicts with existing data or a constraint'}})
         except Exception:
-            self.send_json(500,{'error':{'message':'Unexpected server error; request was not logged with personal data'}})
+            self._send_error(500,{'error':{'message':'Unexpected server error; request was not logged with personal data'}})
+    def _send_error(self, code, payload):
+        if getattr(self,'_response_started',False):
+            self.close_connection=True
+            return
+        self.send_json(code,payload)
     def static_file(self, path):
         root=(Path(__file__).resolve().parents[1]/'web').resolve()
         rel='index.html' if path=='/' else path.lstrip('/')
@@ -169,12 +187,14 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(data,dict): fail(400,'JSON object required')
         email=str(data.get('email','')).strip().lower(); password=data.get('password','')
         if len(email)>254 or not isinstance(password,str) or len(password)>256: fail(400,'Invalid credentials format')
+        if READ_ONLY_MODE and email!=PUBLIC_VISITOR_EMAIL: fail(401,'Email or password not recognized')
         peer=self.client_address[0]
         attempts=[stamp for stamp in LOGIN_ATTEMPTS.get(peer,[]) if time.monotonic()-stamp<LOGIN_WINDOW]
         if len(attempts)>=10: fail(429,'Too many sign-in attempts; wait five minutes')
         with self.db() as db:
             row=db.execute('SELECT * FROM users WHERE email=? AND active=1',(email,)).fetchone()
-            if not row or not verify_password(password,row['password_hash']):
+            expected_public_password=not READ_ONLY_MODE or password==PUBLIC_VISITOR_PASSWORD
+            if not row or not expected_public_password or not verify_password(password,row['password_hash']):
                 LOGIN_ATTEMPTS[peer]=attempts+[time.monotonic()]
                 fail(401,'Email or password not recognized')
             LOGIN_ATTEMPTS.pop(peer,None)
@@ -184,7 +204,7 @@ class Handler(BaseHTTPRequestHandler):
             safe={k:row[k] for k in ('id','email','display_name','role')}
         if READ_ONLY_MODE: safe['role']='viewer'
         secure='; Secure' if SECURE_COOKIES else ''
-        return self.send_json(200,{'user':safe},{'Set-Cookie':f'{COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800{secure}'})
+        return self.send_json(200,{'user':safe,'read_only_mode':READ_ONLY_MODE},{'Set-Cookie':f'{COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800{secure}'})
     def logout(self):
         user=self.session(False)
         if user:
@@ -348,6 +368,6 @@ class Handler(BaseHTTPRequestHandler):
 def serve(host='127.0.0.1',port=8787):
     if host not in ('127.0.0.1','localhost','::1') and not READ_ONLY_MODE:
         raise SystemExit('Refusing remote bind unless HEALTHOPS_READ_ONLY=1; do not expose the mutable local demo.')
-    initialize()
+    initialize(public_read_only=READ_ONLY_MODE)
     ThreadingHTTPServer((host,port),Handler).serve_forever()
 if __name__=='__main__': serve(os.environ.get('HEALTHOPS_HOST','127.0.0.1'),int(os.environ.get('PORT','8787')))

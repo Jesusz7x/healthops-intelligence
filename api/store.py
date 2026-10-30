@@ -7,6 +7,8 @@ from datetime import datetime, timezone, timedelta
 ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = Path(os.environ.get('HEALTHOPS_DB', ROOT / 'data' / 'healthops.sqlite3'))
 ROLES = ('admin', 'operations', 'clinical', 'inventory', 'viewer')
+PUBLIC_VISITOR_EMAIL = 'visitor@healthops.local'
+PUBLIC_VISITOR_PASSWORD = 'HealthOpsViewOnly2026!'
 
 def now(): return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 class ClosingConnection(sqlite3.Connection):
@@ -33,7 +35,7 @@ def verify_password(password, encoded):
         return secrets.compare_digest(password_hash(password, bytes.fromhex(salt_hex)).split(':',1)[1], digest)
     except (ValueError, TypeError): return False
 
-def initialize(path=DB_PATH):
+def initialize(path=DB_PATH, public_read_only=False):
     with connect(path) as db:
         db.executescript('''
         CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, email TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','operations','clinical','inventory','viewer')), password_hash TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL);
@@ -49,8 +51,17 @@ def initialize(path=DB_PATH):
         CREATE INDEX IF NOT EXISTS idx_audit_created ON audit(created_at DESC);
         ''')
         if db.execute('SELECT COUNT(*) FROM users').fetchone()[0] == 0:
-            demos = [('admin@healthops.local','Demo Administrator','admin'),('ops@healthops.local','Demo Operations','operations'),('clinical@healthops.local','Demo Clinical','clinical'),('stock@healthops.local','Demo Inventory','inventory'),('viewer@healthops.local','Demo Viewer','viewer')]
-            for email,name,role in demos: db.execute('INSERT INTO users(email,display_name,role,password_hash,created_at) VALUES(?,?,?,?,?)',(email,name,role,password_hash('DemoHealthOps!2026'),now()))
+            demos = [(PUBLIC_VISITOR_EMAIL,'Public Demo Visitor','viewer',PUBLIC_VISITOR_PASSWORD)] if public_read_only else [
+                ('admin@healthops.local','Demo Administrator','admin','DemoHealthOps!2026'),
+                ('ops@healthops.local','Demo Operations','operations','DemoHealthOps!2026'),
+                ('clinical@healthops.local','Demo Clinical','clinical','DemoHealthOps!2026'),
+                ('stock@healthops.local','Demo Inventory','inventory','DemoHealthOps!2026'),
+                ('viewer@healthops.local','Demo Viewer','viewer','DemoHealthOps!2026'),
+                (PUBLIC_VISITOR_EMAIL,'Public Demo Visitor','viewer',PUBLIC_VISITOR_PASSWORD),
+            ]
+            for email,name,role,password in demos: db.execute('INSERT INTO users(email,display_name,role,password_hash,created_at) VALUES(?,?,?,?,?)',(email,name,role,password_hash(password),now()))
+        elif public_read_only and not db.execute('SELECT 1 FROM users WHERE email=?',(PUBLIC_VISITOR_EMAIL,)).fetchone():
+            db.execute('INSERT INTO users(email,display_name,role,password_hash,created_at) VALUES(?,?,?,?,?)',(PUBLIC_VISITOR_EMAIL,'Public Demo Visitor','viewer',password_hash(PUBLIC_VISITOR_PASSWORD),now()))
         if db.execute('SELECT COUNT(*) FROM patients').fetchone()[0] == 0:
             patients=[('P-1001','Avery Example','avery@example.invalid',34,'active'),('P-1002','Morgan Sample','morgan@example.invalid',58,'active'),('P-1003','Taylor Fiction','taylor@example.invalid',22,'active'),('P-1004','Riley Demo','riley@example.invalid',71,'inactive'),('P-1005','Jordan Placeholder','jordan@example.invalid',46,'active')]
             for code,name,email,age,status in patients: db.execute('INSERT INTO patients(code,full_name,email,age,status,created_at) VALUES(?,?,?,?,?,?)',(code,name,email,age,status,now()))

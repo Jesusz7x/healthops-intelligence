@@ -10,9 +10,9 @@
 - SQLite parameter binding, foreign keys, CHECK constraints and transactionally recorded audit events.
 - Spreadsheet formula escaping in CSV export; CSV import is all-or-nothing and never changes its source upload.
 - Content Security Policy, `nosniff`, no-store API responses, generic errors, and request logs without payloads/cookies/patient data.
-- Remote bind refused unless `HEALTHOPS_READ_ONLY=1`; in that mode every logged-in account receives viewer permissions.
+- Remote bind refused unless `HEALTHOPS_READ_ONLY=1`; in that mode a clean database seeds only the public visitor, public login rejects other demo accounts, every active session is downgraded to viewer, data writes are denied by backend role checks, and the audit feed is available read-only.
 - `.gitignore` excludes SQLite database files, `.env`, bytecode, and test artifacts.
 
 ## Limits and safe use
 
-This is a portfolio demo, not a production security review or healthcare compliance assessment. The seeded demo password is intentionally public and must not protect real data. There is no password reset, MFA, account invitation lifecycle, external identity provider, database backup/restore workflow, retention policy, TLS termination, reverse-proxy hardening, distributed rate limiting, dependency scanner, or independent penetration test. Do not enter protected health information or expose the mutable local instance to the Internet. A public deployment must use synthetic seed data, read-only mode, HTTPS, and an isolated database.
+This is a portfolio demo, not a production security review or healthcare compliance assessment. The seeded demo password is intentionally public and must not protect real data. There is no password reset, MFA, account invitation lifecycle, external identity provider, database backup/restore workflow, retention policy, TLS termination, reverse-proxy hardening, distributed rate limiting, dependency scanner, or independent penetration test. Do not enter protected health information or expose the mutable local instance to the Internet. A public deployment must use synthetic seed data, read-only mode, HTTPS, and an isolated database. The public visitor credential is deliberately published for the demo and must never be reused or treated as a secret.

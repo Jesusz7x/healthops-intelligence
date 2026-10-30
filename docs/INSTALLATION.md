@@ -25,26 +25,22 @@ Use a new `HEALTHOPS_DB` path when you need a fresh demo database. The app does 
 
 See `.env.example` for documented variable names; this project does not load `.env` automatically. Export variables in the shell before starting. No secret key is required because session keys are generated with the OS cryptographic random source and persisted only as digests.
 
-## Public demonstration, if later authorized and hosted
+## Public Render demonstration
 
-A public URL is not deployed or verified. For a read-only demo behind a trusted HTTPS reverse proxy, set:
+The repo contains a free Render Blueprint in [`render.yaml`](../render.yaml). It selects the Python native runtime, pins Python `3.13.5`, runs `python3 api/server.py` without installing dependencies, binds the app to `0.0.0.0`, reads Render's assigned `PORT`, enables `HEALTHOPS_READ_ONLY=1` and `HEALTHOPS_SECURE_COOKIES=1`, and checks `GET /health`. The API health alias `/api/health` remains available.
 
-```sh
-HEALTHOPS_HOST=0.0.0.0 HEALTHOPS_READ_ONLY=1 HEALTHOPS_SECURE_COOKIES=1 python3 api/server.py
-```
+A clean public database seeds only the fictitious read-only visitor account and synthetic operations records. In public mode, the backend accepts only that visitor's login, downgrades all sessions to `viewer`, rejects every data-write permission, and permits read-only access to the audit log. The login page explains the synthetic-data and non-clinical limits. The public demo credential is intentionally visible in README and the login screen; it is not a private secret. Do not reuse it. Do not upload a local SQLite database.
 
-Remote binding exits unless read-only mode is enabled. The reverse proxy must terminate HTTPS, forward only to the local app, restrict request sizes, and avoid recording cookie headers/request bodies. Use a fresh database containing only the bundled synthetic seed. Public accounts are downgraded to viewer. Do not publish an editable/admin demo or upload an owner database.
+### Deploy after publishing this configuration
 
-A hosted service must support persistent storage if records are expected to survive restarts. Free hosting tiers, storage retention, sleep behavior, and terms change frequently; no provider was selected or purchased. Do not add a credit card or deploy until reviewing the provider's current official terms and the security limits above. A production system should use managed PostgreSQL, HTTPS, secret management, backups, migrations, monitoring, account lifecycle, and a security/privacy review; those are outside this demo build.
+The GitHub repository must contain the updated Blueprint and code before Render can deploy it. Then open [Render Dashboard](https://dashboard.render.com/), choose **New → Blueprint**, connect/authorize the `Jesusz7x` GitHub account if prompted, select `Jesusz7x/healthops-intelligence`, review the Blueprint values, and create the service. Render assigns the public `onrender.com` URL after the service is created; no URL is claimed here before that happens. Render's official [first deploy guide](https://render.com/docs/your-first-deploy) describes this connection flow. The Blueprint uses no paid database or paid compute plan. Do not upgrade the plan, add paid services, or provide payment details for this showcase without explicit owner approval.
 
-## Blocked validation
+### Render Free limitations
 
-The execution sandbox forbids opening sockets, and external package installation is unavailable. Therefore live browser access, actual port binding, reverse proxy, TLS, public deployment, and mobile visual checks were not performed. Tests invoke the handler in process and verify generated HTML/API responses against temporary SQLite.
+Render Free web services currently spin down after 15 minutes without inbound traffic and may need about a minute to wake on the next request. Their local filesystem is ephemeral; the SQLite database, synthetic data, and sessions may be lost on spin-down, restart, or redeploy. The app reinitializes/seeds data on startup. Free web services cannot use persistent disks. Render provides 750 included Free instance hours per workspace per calendar month; service availability may be suspended after the included hours are consumed. This is a showcase/demo configuration, not production healthcare hosting. Review [current Free limitations](https://render.com/docs/free) before creating the service.
 
-## Prepared free demo target: Render (not deployed)
+## Validation limits
 
-A safe, read-only Blueprint is in [`render.yaml`](../render.yaml). Render's official docs describe Python web services, require binding to `0.0.0.0` and the assigned `PORT`, and support a health-check path. The project already binds to `0.0.0.0` when configured, reads `PORT`, and exposes `/api/health`.
-
-Render currently offers free web services, but they spin down after 15 minutes idle and may take about a minute to wake. Their free filesystem is ephemeral, so the SQLite database and sessions can reset on redeploy/restart/sleep. That's acceptable only for this read-only seeded demonstration, not for user-entered data. Render documents 750 free instance hours per workspace/month and says no payment method means services are suspended rather than billed for excess included usage. Account creation and linking a public GitHub repo are still needed; no service has been created here and no payment details were added. Review the current limits before connecting an account.
+This build sandbox denies local socket creation (`PermissionError: Operation not permitted`). The four subprocess tests for actual HTTP, HTTPS cookie flags, visitor login, protected paths, and assets are present but skip in this environment. The application has not yet been deployed, so no TLS/HTTPS response or public URL has been verified. Do not add a LIVE DEMO button to the portfolio until the real Render URL is active and its health/login/read-only checks pass. Browser visual, mobile, keyboard, and assistive-technology checks also remain outstanding.
 
 Official references consulted 2026-10-30: [Render free services and filesystem limits](https://render.com/docs/free), [web service port binding and TLS termination](https://render.com/docs/web-services), [Blueprint YAML reference](https://render.com/docs/blueprint-spec), and [first-deploy tutorial](https://render.com/docs/your-first-deploy). These plan details can change; verify them again before deployment.

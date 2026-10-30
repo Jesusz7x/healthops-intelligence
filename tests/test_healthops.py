@@ -43,6 +43,10 @@ class HealthOpsApiTests(unittest.TestCase):
         self.assertEqual(self.req('/health')[1]['synthetic_data_only'],True)
         code,body,_=self.req('/')
         self.assertEqual(code,200); self.assertIn('HealthOps Intelligence',body); self.assertIn('visitor@healthops.local',body); self.assertIn('not certified clinical software',body.lower())
+        css_code,css,_=self.req('/styles.css')
+        js_code,js,_=self.req('/app.js')
+        self.assertEqual(css_code,200); self.assertIn(':root',css)
+        self.assertEqual(js_code,200); self.assertIn('function',js)
     def test_password_hash_and_login_cookie(self):
         code,data,headers=self.login(); self.assertEqual(code,200); self.assertEqual(data['user']['role'],'admin')
         self.assertIn('HttpOnly',headers['Set-Cookie']); self.assertIn('SameSite=Strict',headers['Set-Cookie'])
@@ -111,16 +115,18 @@ class HealthOpsApiTests(unittest.TestCase):
         report=self.req('/api/data-quality')[1]
         self.assertIn('possible_duplicate_name',{i['kind'] for i in report['issues']})
     def test_public_read_only_mode_downgrades_demo_admin(self):
-        original=server.READ_ONLY_MODE
+        original=server.READ_ONLY_MODE; original_secure=server.SECURE_COOKIES
         try:
             server.READ_ONLY_MODE=True
-            code,data,_=self.login(store.PUBLIC_VISITOR_EMAIL,store.PUBLIC_VISITOR_PASSWORD)
+            server.SECURE_COOKIES=True
+            code,data,headers=self.login(store.PUBLIC_VISITOR_EMAIL,store.PUBLIC_VISITOR_PASSWORD)
             self.assertEqual(code,200); self.assertEqual(data['user']['role'],'viewer')
             self.assertTrue(data['read_only_mode'])
+            self.assertIn('Secure',headers['Set-Cookie'])
             self.assertEqual(self.req('/api/audit')[0],200)
             self.assertEqual(self.login('admin@healthops.local','DemoHealthOps!2026')[0],401)
             self.assertEqual(self.req('/api/patients','POST',{'code':'PUBLIC-NO','full_name':'Read Only','email':'ro@example.invalid','age':20})[0],403)
-        finally: server.READ_ONLY_MODE=original
+        finally: server.READ_ONLY_MODE=original; server.SECURE_COOKIES=original_secure
 
     def test_read_only_database_seeds_visitor_without_administrator_accounts(self):
         with tempfile.TemporaryDirectory(prefix='healthops-public-seed-') as temp:

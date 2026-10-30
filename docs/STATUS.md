@@ -18,7 +18,7 @@ The `Handler.handle()` override was removed and the standard HTTP lifecycle is r
 
 ## Repository and hosting state
 
-The independent local repository is on `main`, with initial source commit `137cf33` and the requested GitHub noreply author identity. Use `git log --oneline` for the current local revision. No `origin` is configured because the GitHub repository has not been created. The portfolio source snapshot has the local feature commit `7481a5f`. In this agent session, `gh auth status` still marks the token invalid and GitHub DNS is unavailable; neither remote repository creation/push nor the Render service/Pages publication was performed. The public source and live demo URLs remain unavailable, not merely untested.
+The independent local repository is on `main` with origin `https://github.com/Jesusz7x/healthops-intelligence.git`. The latest local commit is `7fe4939` with the requested GitHub noreply author identity; cached `origin/main` remains `e51d967`, but `git fetch origin` failed, so the remote state is unknown and no push was attempted. `gh auth status` reports an invalid token and the execution environment cannot resolve GitHub. No Render service has been created and there is no assigned demo URL. The public repository and service URLs are not verified from this environment.
 
 
 ## HTTP lifecycle correction (2026-10-30)
@@ -32,6 +32,6 @@ Tests now include four real-HTTP subprocess checks for page/assets, authenticati
 
 ## Render showcase preparation (2026-10-30)
 
-`render.yaml` now pins Render's Python runtime to 3.13.5, uses the free web plan, avoids dependency installation, starts `python3 api/server.py`, relies on Render's injected `PORT`, binds `0.0.0.0`, enables read-only mode and Secure cookies, and checks `/health`. `/api/health` remains as an alias. Public mode seeds only a read-only visitor on a clean database, accepts only that account for login, downgrades session roles to viewer, rejects protected writes in the backend, and permits visitors to inspect the synthetic audit feed. The UI provides the visitor credentials and a bilingual synthetic/non-clinical notice.
+`render.yaml` now pins Render's Python runtime to 3.13.5, uses the free web plan, avoids dependency installation, starts `python3 api/server.py`, relies on Render's injected `PORT`, binds `0.0.0.0`, enables read-only mode and Secure cookies, and checks `/health`. `/api/health` remains as an alias. Public mode seeds only a read-only visitor on a clean database, accepts only that account for login, downgrades session roles to viewer, rejects protected writes in the backend, and permits visitors to inspect the synthetic audit feed. The UI provides the visitor credentials and a bilingual synthetic/non-clinical notice. These changes are committed locally as `7fe4939`, not pushed.
 
 Render Free is currently offered, but no service was created and no generated public URL exists. A GitHub/Render account connection and creation of the Blueprint from the dashboard remain owner actions. Local socket restrictions still prevent HTTP/HTTPS verification and the application has not been deployed. Do not add a public LIVE DEMO link until a deployed URL passes health, TLS, session, asset, and write-block checks.
